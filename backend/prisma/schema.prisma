@@ -1,0 +1,220 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Material {
+  materialId         Int               @id @default(autoincrement()) @map("material_id")
+  materialCode       String            @unique @db.VarChar(50) @map("material_code")
+  materialNameTh     String            @db.VarChar(255) @map("material_name_th")
+  materialNameEn     String?           @db.VarChar(255) @map("material_name_en")
+  unit               String            @db.VarChar(50)
+  categoryId         Int               @map("category_id")
+  reorderPoint       Int?              @map("reorder_point")
+  safetyStock        Int?              @map("safety_stock")
+  locationId         Int?              @map("location_id")
+  description        String?           @db.Text
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  category           Category          @relation(fields: [categoryId], references: [categoryId])
+  location           Location?          @relation(fields: [locationId], references: [locationId])
+
+  requestItems       RequestItem[]
+  issuanceItems      IssuanceItem[]
+  stockTransactions  StockTransaction[]
+  StockLevel         StockLevel[]
+
+  @@map("materials")
+}
+
+model Category {
+  categoryId   Int        @id @default(autoincrement()) @map("category_id")
+  categoryName String     @unique @db.VarChar(100) @map("category_name")
+  description  String?    @db.Text
+  materials    Material[]
+
+  @@map("categories")
+}
+
+model RequestItem {
+  requestItemId     Int      @id @default(autoincrement()) @map("request_item_id")
+  requestId         Int      @map("request_id")
+  materialId        Int      @map("material_id")
+  requestedQuantity Int      @map("requested_quantity")
+  note              String?
+
+  request           Request  @relation(fields: [requestId], references: [requestId])
+  material          Material @relation(fields: [materialId], references: [materialId])
+
+  @@map("request_items")
+  IssuanceItem IssuanceItem[]
+}
+
+model Request {
+  requestId         Int                      @id @default(autoincrement()) @map("request_id")
+  requestNumber     String                   @unique @db.VarChar(20) @map("request_number")
+  requesterId       Int                      @map("requester_id")
+  departmentId      Int                      @map("department_id")
+  requestDate       DateTime                 @db.Date @map("request_date")
+  requestReason     String                   @db.Text @map("request_reason")
+  approvalStatus    RequestApprovalStatus    @map("approval_status")
+  approvedBy        Int?                     @map("approved_by")
+  approvedDate      DateTime?                @map("approved_date")
+  approvalReason    String?                  @db.Text @map("approval_reason")
+  processingStatus  RequestProcessingStatus  @map("processing_status")
+  createdAt         DateTime                 @default(now()) @map("created_at")
+  updatedAt         DateTime                 @updatedAt @map("updated_at")
+
+  requester         User                     @relation("RequesterRequests", fields: [requesterId], references: [userId])
+  department        Departments              @relation(fields: [departmentId], references: [department_id])
+  approver          User?                    @relation("ApproverRequests", fields: [approvedBy], references: [userId])
+  requestItems      RequestItem[]
+  issuances         Issuance[]
+
+  @@map("requests")
+}
+
+model Issuance {
+  issuanceId      Int        @id @default(autoincrement()) @map("issuance_id")
+  requestId       Int        @unique @map("request_id")
+  issuanceNumber  String     @unique @db.VarChar(20) @map("issuance_number")
+  issuedBy        Int        @map("issued_by")
+  issuedDate      DateTime   @default(now()) @map("issued_date")
+  note            String?    @db.Text
+
+  request         Request    @relation(fields: [requestId], references: [requestId])
+  issuer          User       @relation("IssuerIssuances", fields: [issuedBy], references: [userId])
+  issuanceItems   IssuanceItem[]
+
+  @@map("issuances")
+}
+
+model IssuanceItem {
+  issuanceItemId Int      @id @default(autoincrement()) @map("issuance_item_id")
+  issuanceId     Int      @map("issuance_id")
+  materialId     Int      @map("material_id")
+  requestItemId  Int      @map("request_item_id")
+  issuedQuantity Int      @map("issued_quantity")
+  note           String?
+
+  issuance       Issuance @relation(fields: [issuanceId], references: [issuanceId])
+  material       Material @relation(fields: [materialId], references: [materialId])
+  requestItem    RequestItem @relation(fields: [requestItemId], references: [requestItemId])
+
+  @@map("issuance_items")
+}
+
+model StockTransaction {
+  transactionId   Int              @id @default(autoincrement()) @map("transaction_id")
+  materialId      Int              @map("material_id")
+  locationId      Int              @map("location_id")
+  transactionType TransactionType @map("transaction_type")
+  quantity        Int
+  transactionDate DateTime         @default(now()) @map("transaction_date")
+  referenceId     Int?             @map("reference_id")
+  description     String?          @db.Text
+
+  material        Material         @relation(fields: [materialId], references: [materialId])
+  location        Location         @relation(fields: [locationId], references: [locationId])
+
+  @@map("stock_transactions")
+}
+
+model StockLevel {
+  stockLevelId Int       @id @default(autoincrement()) @map("stock_level_id")
+  materialId   Int       @map("material_id")
+  locationId   Int       @map("location_id")
+  quantity     Int       @default(0)
+  lastUpdated  DateTime  @updatedAt @map("last_updated")
+
+  material     Material  @relation(fields: [materialId], references: [materialId])
+  location     Location  @relation(fields: [locationId], references: [locationId])
+
+  @@unique([materialId, locationId], name: "unique_stock_level")
+  @@map("stock_levels")
+}
+
+model User {
+  userId        Int        @id @default(autoincrement()) @map("user_id")
+  username      String     @unique @db.VarChar(50)
+  password      String     @db.VarChar(255)
+  firstName     String     @db.VarChar(100) @map("first_name")
+  lastName      String     @db.VarChar(100) @map("last_name")
+  email         String?    @unique @db.VarChar(100)
+  phoneNumber   String?    @db.VarChar(20) @map("phone_number")
+  departmentId  Int        @map("department_id")
+  role          UserRole   @default(staff)
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  department         Departments @relation(fields: [departmentId], references: [department_id])
+  requesterRequests  Request[]  @relation("RequesterRequests")
+  approverRequests   Request[]  @relation("ApproverRequests")
+  issuerIssuances    Issuance[] @relation("IssuerIssuances")
+
+  @@map("users")
+}
+
+model Departments {
+  department_id   Int       @id @default(autoincrement()) @map("department_id")
+  department_name String    @unique @db.VarChar(100) @map("department_name")
+  description     String?   @db.Text
+  users           User[]
+  requests        Request[]
+
+  @@map("departments")
+}
+
+model Location {
+  locationId        Int               @id @default(autoincrement()) @map("location_id")
+  locationName      String            @unique @db.VarChar(100) @map("location_name")
+  locationType      String?           @db.VarChar(50) @map("location_type")
+  description       String?           @db.Text
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  stockLevels       StockLevel[]
+  stockTransactions StockTransaction[]
+
+  @@map("locations")
+  Material Material[]
+}
+
+// ENUMS
+
+enum RequestApprovalStatus {
+  PENDING  @map("รออนุมัติ")
+  APPROVED @map("อนุมัติแล้ว")
+  REJECTED @map("ไม่อนุมัติ")
+
+  @@map("request_approval_status")
+}
+
+enum RequestProcessingStatus {
+  PENDING_ISSUE @map("รอจ่าย")
+  IN_PROGRESS   @map("กำลังดำเนินการ")
+  ISSUED        @map("เบิกจ่ายแล้ว")
+  REJECTED      @map("ไม่อนุมัติ")
+
+  @@map("request_processing_status")
+}
+
+enum TransactionType {
+  IN  @map("เข้า")
+  OUT @map("ออก")
+
+  @@map("transaction_type")
+}
+
+enum UserRole {
+  admin
+  staff
+  approver
+
+  @@map("user_role")
+}
