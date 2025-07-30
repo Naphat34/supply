@@ -18,7 +18,7 @@ const reportRoutes = require('./src/routes/reportRoutes');
 
 const app = express();
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: 'https://cssdbk.onrender.com',
   credentials: true
 }));
 app.use(cookieParser());
